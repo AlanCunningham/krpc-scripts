@@ -20,7 +20,7 @@ def launch(connection):
     max_fuel_capacity = vessel.resources.max("LiquidFuel")
     monitor_fuel_expression = connection.krpc.Expression.less_than(
         connection.krpc.Expression.call(fuel_amount),
-        connection.krpc.Expression.constant_float(max_fuel_capacity / 2)
+        connection.krpc.Expression.constant_float(10)
     )
     fuel_event = connection.krpc.add_event(monitor_fuel_expression)
     with fuel_event.condition:
@@ -30,7 +30,7 @@ def launch(connection):
     time.sleep(1)
     vessel.control.activate_next_stage()
 
-    # Wait until 500 and deploy the parachutes
+    # Wait until 500m and deploy the parachutes
     vessel.auto_pilot.sas = False
     altitude = connection.get_call(getattr, vessel.flight(), "mean_altitude")
     parachute_altitude = connection.krpc.Expression.less_than(
@@ -40,6 +40,7 @@ def launch(connection):
     altitude_event = connection.krpc.add_event(parachute_altitude)
     with altitude_event.condition:
         altitude_event.wait()
+    print(f"Altitude: {vessel.flight().mean_altitude}")
     vessel.control.activate_next_stage()
 
 
