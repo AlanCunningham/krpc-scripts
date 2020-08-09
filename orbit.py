@@ -4,8 +4,8 @@ import helpers
 
 
 """
-This script takes a two-stage rocket and launches into an ~80km orbit. This
-script currently assumes the following:
+This script takes a two-stage rocket and launches it into orbit. The following
+assumptions are made:
 - The first stage uses solid fuel boosters
 - The second stage has RCS available
 - There's enough fuel available to get into orbit
