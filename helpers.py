@@ -68,7 +68,7 @@ def wait_for_fuel_less_than(connection, vessel, fuel_type, target_fuel):
     fuel_event = connection.krpc.add_event(monitor_fuel_expression)
     with fuel_event.condition:
         fuel_event.wait()
-        print(f"Out of fuel: {fuel_type}")
+        print(f"{fuel_type} empty")
 
 
 def wait_for_apoapsis_more_than(connection, vessel, target_apoapsis):
