@@ -17,16 +17,18 @@ script currently assumes the following:
 """
 
 
-def launch(connection, vessel, target_altitude):
+def launch(connection, vessel, direction, target_altitude):
     """
     Launch a given vessel into orbit at a given target altitude.
     :params connection: A krpc connection
     :params vessel: A vessel object
+    :params vessel: The direction of the orbit - "north", "east", "south",
+    or "west"
     :params target_altitude: The target apoapsis and periapsis altitude in meters
     """
     # Setup heading, control and throttle
     vessel.auto_pilot.engage()
-    vessel.auto_pilot.target_pitch = 90
+    vessel.auto_pilot.target_pitch_and_heading(90, helpers.heading[direction])
     vessel.control.throttle = 1
     time.sleep(1)
 
@@ -77,4 +79,4 @@ def launch(connection, vessel, target_altitude):
 if __name__ == "__main__":
     connection = krpc.connect(address="192.168.0.215")
     vessel = connection.space_center.active_vessel
-    launch(connection, vessel, 100000)
+    launch(connection, vessel, "east", 100000)
