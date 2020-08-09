@@ -1,11 +1,3 @@
-heading = {
-    "north": 0,
-    "east": 90,
-    "south": 180,
-    "west": 270
-}
-
-
 def get_thrust_to_weight_ratio(conn, vessel):
     """
     Gets the thrust-to-weight ratio of a given vessel.

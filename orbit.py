@@ -1,4 +1,5 @@
 import time
+from datetime import datetime, timedelta
 import krpc
 import helpers
 
@@ -16,19 +17,24 @@ assumptions are made:
     - Activate parachute if less than a given altitude
 """
 
+HEADING_NORTH = 0
+HEADING_EAST = 90
+HEADING_SOUTH = 180
+HEADING_WEST = 270
 
-def launch(connection, vessel, direction, target_altitude):
+
+def launch(connection, vessel, heading, target_altitude):
     """
     Launch a given vessel into orbit at a given target altitude.
     :params connection: A krpc connection
     :params vessel: A vessel object
-    :params vessel: The direction of the orbit - "north", "east", "south",
-    or "west"
+    :params heading: The heading of the orbit
     :params target_altitude: The target apoapsis and periapsis altitude in meters
     """
     # Setup heading, control and throttle
+    start_time = datetime.now()
     vessel.auto_pilot.engage()
-    vessel.auto_pilot.target_pitch_and_heading(90, helpers.heading[direction])
+    vessel.auto_pilot.target_pitch_and_heading(90, heading)
     vessel.control.throttle = 1
     time.sleep(1)
 
@@ -63,20 +69,11 @@ def launch(connection, vessel, direction, target_altitude):
     # In stable orbit
     vessel.control.rcs = False
     vessel.auto_pilot.disengage()
-
-    # Decouple when out of fuel
-    helpers.wait_for_fuel_less_than(connection, vessel, "LiquidFuel", 0.1)
-    vessel.auto_pilot.disengage()
-    vessel.control.activate_next_stage()
-
-    # Deploy the parachutes when below a certain altitude
-    vessel.auto_pilot.sas = False
-    deploy_at_altitude = 4000
-    helpers.wait_for_altitude_less_than(connection, vessel, deploy_at_altitude)
-    vessel.control.activate_next_stage()
+    launch_duration = datetime.now() - start_time
+    print(f"Stable orbit achieved in {launch_duration}")
 
 
 if __name__ == "__main__":
     connection = krpc.connect(address="192.168.0.215")
     vessel = connection.space_center.active_vessel
-    launch(connection, vessel, "east", 100000)
+    launch(connection, vessel, HEADING_EAST, 2863330)
