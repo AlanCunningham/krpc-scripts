@@ -1,3 +1,5 @@
+import math
+
 def get_thrust_to_weight_ratio(conn, vessel):
     """
     Gets the thrust-to-weight ratio of a given vessel.
@@ -12,6 +14,77 @@ def get_thrust_to_weight_ratio(conn, vessel):
     ratio = thrust / (mass * gravity)
     print(f"Thrust: {thrust} | Mass: {mass} | Gravity: {gravity} | Ratio: {ratio}")
     return ratio
+
+
+def get_total_delta_v(conn, vessel):
+    """
+    Gets the total delta-v available to a given vessel.
+    # Δv = Isp * g0   * ln(Mt/Md)
+    #    = 400 * 9.81 * ln(3.72/1.72)
+    #    = 400 * 9.81 * ln(2.16)
+    #    = 400 * 9.81 * 0.771 = 3026.97 m/s
+    :params conn: A krpc connection
+    :params vessel: Vessel object
+    """
+    number_of_stages = vessel.control.current_stage
+    impulse = vessel.kerbin_sea_level_specific_impulse
+    sum_delta_v = 0
+    sum_specific_impulse = 0
+
+    # Get the mass of each stage
+    stage_masses = {}
+    for stage in range(number_of_stages, -2, -1):
+        total_mass_sum = 0
+        dry_mass_sum = 0
+        for stage_part in vessel.parts.in_decouple_stage(stage):
+            total_mass_sum = total_mass_sum + stage_part.mass / 1000
+            dry_mass_sum = dry_mass_sum + stage_part.dry_mass / 1000
+        stage_masses[stage] = [total_mass_sum, dry_mass_sum]
+    print(f"Stage masses: {stage_masses}")
+
+    for stage in range(number_of_stages, -2, -1):
+        # For each stage
+        print(f"Stage {stage}")
+        parts_list = []
+        stage_delta_v = 0
+        stage_total_mass = 0
+        stage_dry_mass = 0
+
+        for stage_part in vessel.parts.in_decouple_stage(stage):
+            # For each part in the current stage
+            if stage_part.title in parts_list:
+                # Ignore if we have the same engine more than once in the same
+                # stage
+                break
+            else:
+                # Add the part to the current stage list
+                parts_list.append(stage_part.title)
+
+                # Sum up the mass of each part in the current stage in tonnes
+                stage_total_mass = stage_total_mass + stage_part.mass / 1000
+                stage_dry_mass = stage_dry_mass + stage_part.dry_mass / 1000
+                # print(f"- {stage_part.title}: Stage mass: {stage_total_mass} | Stage dry mass: {stage_dry_mass}")
+
+                # If part is an engine, get the specific impulse and delta v
+                if stage_part.engine:
+                    stage_delta_v = stage_part.engine.kerbin_sea_level_specific_impulse * conn.space_center.bodies["Kerbin"].surface_gravity * math.log(stage_total_mass/stage_dry_mass)
+                    # Add to the sum delta v and specific impulse
+                    sum_delta_v = sum_delta_v + stage_delta_v
+                    sum_specific_impulse = sum_specific_impulse + stage_part.engine.kerbin_sea_level_specific_impulse
+
+        # Now add the mass from the next stages (ie the mass that this stage
+        # will be carrying)
+
+        # Work out the delta v for the current stage
+        print(f"Delta V for stage: {stage_delta_v}")
+        print(f"Total mass for stage: {stage_total_mass}")
+        print(f"Dry mass for stage: {stage_dry_mass}\n")
+
+    print(f"Total delta v: {sum_delta_v}")
+    total_mass = vessel.mass / 1000
+    dry_mass = vessel.dry_mass / 1000
+    print(f"Test Total delta v: {sum_specific_impulse * conn.space_center.bodies['Kerbin'].surface_gravity * math.log(total_mass/dry_mass)}")
+
 
 
 def wait_for_altitude_more_than(connection, vessel, target_altitude):
