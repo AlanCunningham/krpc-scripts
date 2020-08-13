@@ -1,5 +1,6 @@
 import math
 
+
 def get_thrust_to_weight_ratio(conn, vessel):
     """
     Gets the thrust-to-weight ratio of a given vessel.
@@ -60,16 +61,17 @@ def get_estimated_delta_v(conn, vessel):
                 engine_part.engine.kerbin_sea_level_specific_impulse
                 * kerbin_gravity
                 * math.log(
-                    total_mass/(stage_dry_mass_sum + previous_stage_total_mass_sum)
+                    total_mass / (stage_dry_mass_sum + previous_stage_total_mass_sum)
                 )
             )
         # Add to the sum delta v and specific impulse
         sum_delta_v = sum_delta_v + stage_delta_v
         if len(vessel.parts.in_decouple_stage(stage)):
-            previous_stage_total_mass_sum = previous_stage_total_mass_sum + stage_total_mass_sum
+            previous_stage_total_mass_sum = (
+                previous_stage_total_mass_sum + stage_total_mass_sum
+            )
     print(f"Delta-v: {sum_delta_v}")
     return sum_delta_v
-
 
 
 def wait_for_altitude_more_than(connection, vessel, target_altitude):
@@ -82,7 +84,7 @@ def wait_for_altitude_more_than(connection, vessel, target_altitude):
     altitude = connection.get_call(getattr, vessel.flight(), "mean_altitude")
     parachute_altitude = connection.krpc.Expression.greater_than(
         connection.krpc.Expression.call(altitude),
-        connection.krpc.Expression.constant_double(target_altitude)
+        connection.krpc.Expression.constant_double(target_altitude),
     )
     altitude_event = connection.krpc.add_event(parachute_altitude)
     with altitude_event.condition:
@@ -100,7 +102,7 @@ def wait_for_altitude_less_than(connection, vessel, target_altitude):
     altitude = connection.get_call(getattr, vessel.flight(), "mean_altitude")
     parachute_altitude = connection.krpc.Expression.less_than(
         connection.krpc.Expression.call(altitude),
-        connection.krpc.Expression.constant_double(target_altitude)
+        connection.krpc.Expression.constant_double(target_altitude),
     )
     altitude_event = connection.krpc.add_event(parachute_altitude)
     with altitude_event.condition:
@@ -119,7 +121,7 @@ def wait_for_fuel_less_than(connection, vessel, fuel_type, target_fuel):
     fuel_amount = connection.get_call(vessel.resources.amount, name=fuel_type)
     monitor_fuel_expression = connection.krpc.Expression.less_than(
         connection.krpc.Expression.call(fuel_amount),
-        connection.krpc.Expression.constant_float(target_fuel)
+        connection.krpc.Expression.constant_float(target_fuel),
     )
     fuel_event = connection.krpc.add_event(monitor_fuel_expression)
     with fuel_event.condition:
@@ -134,10 +136,11 @@ def wait_for_apoapsis_more_than(connection, vessel, target_apoapsis):
     :params vessel: A vessel object
     :params target_apoapsis: A double of the target apoapsis altitude in meters
     """
-    apoapsis_altitude = connection.get_call(getattr, vessel.orbit, 'apoapsis_altitude')
+    apoapsis_altitude = connection.get_call(getattr, vessel.orbit, "apoapsis_altitude")
     expr = connection.krpc.Expression.greater_than(
         connection.krpc.Expression.call(apoapsis_altitude),
-        connection.krpc.Expression.constant_double(target_apoapsis))
+        connection.krpc.Expression.constant_double(target_apoapsis),
+    )
     event = connection.krpc.add_event(expr)
     with event.condition:
         event.wait()
@@ -151,10 +154,13 @@ def wait_for_periapsis_more_than(connection, vessel, target_periapsis):
     :params vessel: A vessel object
     :params target_periapsis: A double of the target periapsis altitude in meters
     """
-    periapsis_altitude = connection.get_call(getattr, vessel.orbit, 'periapsis_altitude')
+    periapsis_altitude = connection.get_call(
+        getattr, vessel.orbit, "periapsis_altitude"
+    )
     expr = connection.krpc.Expression.greater_than(
         connection.krpc.Expression.call(periapsis_altitude),
-        connection.krpc.Expression.constant_double(target_periapsis))
+        connection.krpc.Expression.constant_double(target_periapsis),
+    )
     event = connection.krpc.add_event(expr)
     with event.condition:
         event.wait()
@@ -168,10 +174,11 @@ def wait_for_time_to_apoapsis_less_than(connection, vessel, target_time):
     :params vessel: A vessel object
     :params target_time: A double of the target time in seconds to the apoapsis
     """
-    time_to_apoapsis = connection.get_call(getattr, vessel.orbit, 'time_to_apoapsis')
+    time_to_apoapsis = connection.get_call(getattr, vessel.orbit, "time_to_apoapsis")
     expr = connection.krpc.Expression.less_than(
         connection.krpc.Expression.call(time_to_apoapsis),
-        connection.krpc.Expression.constant_double(target_time))
+        connection.krpc.Expression.constant_double(target_time),
+    )
     event = connection.krpc.add_event(expr)
     with event.condition:
         event.wait()
