@@ -16,16 +16,22 @@ def get_thrust_to_weight_ratio(conn, vessel):
     return ratio
 
 
-def get_total_delta_v(conn, vessel):
+def get_estimated_delta_v(conn, vessel):
     """
-    Gets the total delta-v available to a given vessel.
-    Δv = Isp * g0   * ln(Mt/Md)
+    Gets the estimated delta-v of a given vessel. This is a rough approxmation
+    and may be less accurate the larger the vessel. Also kerbin gravity is
+    always used which may throw off the final result slightly.
+    https://wiki.kerbalspaceprogram.com/wiki/Cheat_sheet
+    Δv = Isp * g0   * ln(total_mass/dry_mass)
+    For example:
        = 400 * 9.81 * ln(3.72/1.72)
        = 400 * 9.81 * ln(2.16)
        = 400 * 9.81 * 0.771 = 3026.97 m/s
     :params conn: A krpc connection
     :params vessel: Vessel object
+    :returns: A float of the estimated delta v
     """
+    print("Calculating delta-v")
     kerbin_gravity = conn.space_center.bodies["Kerbin"].surface_gravity
     number_of_stages = vessel.control.current_stage
     sum_delta_v = 0
@@ -67,7 +73,7 @@ def get_total_delta_v(conn, vessel):
         if len(vessel.parts.in_decouple_stage(stage)):
             previous_stage_total_mass_sum = previous_stage_total_mass_sum + stage_total_mass_sum
 
-    print(f"Total delta v: {sum_delta_v}")
+    print(f"Delta-v: {sum_delta_v}")
     return sum_delta_v
 
 

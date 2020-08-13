@@ -36,8 +36,7 @@ def launch(connection, vessel, heading, target_altitude):
     vessel.auto_pilot.engage()
     vessel.auto_pilot.target_pitch_and_heading(90, heading)
     vessel.control.throttle = 1
-    helpers.get_total_delta_v(connection, vessel)
-    return
+    helpers.get_estimated_delta_v(connection, vessel)
 
     # Launch
     print("Launch")
