@@ -19,71 +19,82 @@ def get_thrust_to_weight_ratio(conn, vessel):
 def get_total_delta_v(conn, vessel):
     """
     Gets the total delta-v available to a given vessel.
-    # Δv = Isp * g0   * ln(Mt/Md)
-    #    = 400 * 9.81 * ln(3.72/1.72)
-    #    = 400 * 9.81 * ln(2.16)
-    #    = 400 * 9.81 * 0.771 = 3026.97 m/s
+    Δv = Isp * g0   * ln(Mt/Md)
+       = 400 * 9.81 * ln(3.72/1.72)
+       = 400 * 9.81 * ln(2.16)
+       = 400 * 9.81 * 0.771 = 3026.97 m/s
     :params conn: A krpc connection
     :params vessel: Vessel object
     """
+    kerbin_gravity = conn.space_center.bodies["Kerbin"].surface_gravity
     number_of_stages = vessel.control.current_stage
-    impulse = vessel.kerbin_sea_level_specific_impulse
     sum_delta_v = 0
     sum_specific_impulse = 0
 
-    # Get the mass of each stage
-    stage_masses = {}
-    for stage in range(number_of_stages, -2, -1):
-        total_mass_sum = 0
-        dry_mass_sum = 0
-        for stage_part in vessel.parts.in_decouple_stage(stage):
-            total_mass_sum = total_mass_sum + stage_part.mass / 1000
-            dry_mass_sum = dry_mass_sum + stage_part.dry_mass / 1000
-        stage_masses[stage] = [total_mass_sum, dry_mass_sum]
-    print(f"Stage masses: {stage_masses}")
-
-    for stage in range(number_of_stages, -2, -1):
-        # For each stage
-        print(f"Stage {stage}")
+    # Iterate through each part in the stage in reverse-stage order, so we
+    # can accumulate the mass as we go.
+    total_mass = 0
+    dry_mass = 0
+    previous_stage_total_mass_sum = 0
+    # for stage in range(number_of_stages, -2, -1):
+    for stage in range(-2, number_of_stages):
+        print(f"Stage {stage} (Number of parts: {len(vessel.parts.in_decouple_stage(stage))})")
         parts_list = []
+        engine_list = []
         stage_delta_v = 0
-        stage_total_mass = 0
-        stage_dry_mass = 0
-
+        stage_total_mass_sum = 0
+        stage_dry_mass_sum = 0
+        # For each part in the current stage
         for stage_part in vessel.parts.in_decouple_stage(stage):
-            # For each part in the current stage
-            if stage_part.title in parts_list:
+
+            if stage_part.title in parts_list and stage_part.engine:
                 # Ignore if we have the same engine more than once in the same
                 # stage
+                print("###### Ignore #######")
                 break
             else:
                 # Add the part to the current stage list
                 parts_list.append(stage_part.title)
+                print(f"{stage_part.title}: Total mass: {stage_part.mass / 1000} | Dry mass: {stage_part.dry_mass / 1000}")
+
+                # Accumulate the dry mass so far
+                stage_total_mass_sum = stage_total_mass_sum + stage_part.mass / 1000
+                stage_dry_mass_sum = stage_dry_mass_sum + stage_part.dry_mass / 1000
 
                 # Sum up the mass of each part in the current stage in tonnes
-                stage_total_mass = stage_total_mass + stage_part.mass / 1000
-                stage_dry_mass = stage_dry_mass + stage_part.dry_mass / 1000
-                # print(f"- {stage_part.title}: Stage mass: {stage_total_mass} | Stage dry mass: {stage_dry_mass}")
+                total_mass = total_mass + stage_part.mass / 1000
+                dry_mass = dry_mass + stage_part.dry_mass / 1000
 
-                # If part is an engine, get the specific impulse and delta v
                 if stage_part.engine:
-                    stage_delta_v = stage_part.engine.kerbin_sea_level_specific_impulse * conn.space_center.bodies["Kerbin"].surface_gravity * math.log(stage_total_mass/stage_dry_mass)
-                    # Add to the sum delta v and specific impulse
-                    sum_delta_v = sum_delta_v + stage_delta_v
-                    sum_specific_impulse = sum_specific_impulse + stage_part.engine.kerbin_sea_level_specific_impulse
+                    engine_list.append(stage_part)
 
-        # Now add the mass from the next stages (ie the mass that this stage
-        # will be carrying)
+        # After adding up the mass for part in the stage, work out the delta v
+        # for this stage
+        for engine_part in engine_list:
+            print(f"Calculation: engine_part.engine.kerbin_sea_level_specific_impulse * kerbin_gravity * math.log(total_mass/stage_dry_mass_sum + previous_stage_total_mass_sum)")
+            print(f"Calculation: {engine_part.engine.kerbin_sea_level_specific_impulse} * {kerbin_gravity} * math.log({total_mass}/{stage_dry_mass_sum} + {previous_stage_total_mass_sum})")
+            print(f"Calculation: {engine_part.engine.kerbin_sea_level_specific_impulse} * {kerbin_gravity} * {math.log(total_mass/stage_dry_mass_sum + previous_stage_total_mass_sum)}")
+            stage_delta_v = engine_part.engine.kerbin_sea_level_specific_impulse * kerbin_gravity * math.log(total_mass/(stage_dry_mass_sum + previous_stage_total_mass_sum))
 
-        # Work out the delta v for the current stage
+            # Add to the sum delta v and specific impulse
+            sum_delta_v = sum_delta_v + stage_delta_v
+            sum_specific_impulse = sum_specific_impulse + engine_part.engine.kerbin_sea_level_specific_impulse
+
+        # Debug
+        print(f"Total mass so far: {total_mass}")
+        print(f"Dry mass so far: {dry_mass + previous_stage_total_mass_sum}")
         print(f"Delta V for stage: {stage_delta_v}")
-        print(f"Total mass for stage: {stage_total_mass}")
-        print(f"Dry mass for stage: {stage_dry_mass}\n")
+
+        if len(vessel.parts.in_decouple_stage(stage)):
+            previous_stage_total_mass_sum = previous_stage_total_mass_sum + stage_total_mass_sum
+            print(f"Adding total mass from this stage: {previous_stage_total_mass_sum}")
+
+        print("\n")
 
     print(f"Total delta v: {sum_delta_v}")
     total_mass = vessel.mass / 1000
     dry_mass = vessel.dry_mass / 1000
-    print(f"Test Total delta v: {sum_specific_impulse * conn.space_center.bodies['Kerbin'].surface_gravity * math.log(total_mass/dry_mass)}")
+    print(f"Test Total delta v: {sum_specific_impulse * kerbin_gravity * math.log(total_mass/dry_mass)}")
 
 
 
