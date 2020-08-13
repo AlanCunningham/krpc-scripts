@@ -46,16 +46,13 @@ def get_estimated_delta_v(conn, vessel):
         stage_dry_mass_sum = 0
         # For each part in the current stage
         for stage_part in vessel.parts.in_decouple_stage(stage):
-            # Accumulate the dry mass so far
+            # Accumulate the mass so far
             stage_total_mass_sum = stage_total_mass_sum + stage_part.mass / 1000
             stage_dry_mass_sum = stage_dry_mass_sum + stage_part.dry_mass / 1000
-
-            # Sum up the mass of each part in the current stage in tonnes
+            # Sum up the total mass
             total_mass = total_mass + stage_part.mass / 1000
-
             if stage_part.engine:
                 engine_list.append(stage_part)
-
         # After adding up the mass for part in the stage, work out the delta v
         # for this stage
         for engine_part in engine_list:
@@ -66,13 +63,10 @@ def get_estimated_delta_v(conn, vessel):
                     total_mass/(stage_dry_mass_sum + previous_stage_total_mass_sum)
                 )
             )
-
         # Add to the sum delta v and specific impulse
         sum_delta_v = sum_delta_v + stage_delta_v
-
         if len(vessel.parts.in_decouple_stage(stage)):
             previous_stage_total_mass_sum = previous_stage_total_mass_sum + stage_total_mass_sum
-
     print(f"Delta-v: {sum_delta_v}")
     return sum_delta_v
 
