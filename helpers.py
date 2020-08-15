@@ -17,11 +17,10 @@ def get_thrust_to_weight_ratio(conn, vessel):
     return ratio
 
 
-def get_estimated_delta_v(conn, vessel):
+def get_estimated_delta_v(conn, vessel, sea_level_impulse=True):
     """
     Gets the estimated delta-v of a given vessel. This is a rough approxmation
-    and may be less accurate the larger the vessel. Also kerbin gravity is
-    always used which may throw off the final result slightly.
+    and may be less accurate the larger the vessel.
     https://wiki.kerbalspaceprogram.com/wiki/Cheat_sheet
     Δv = Isp * g0   * ln(total_mass/dry_mass)
     For example:
@@ -30,6 +29,8 @@ def get_estimated_delta_v(conn, vessel):
        = 400 * 9.81 * 0.771 = 3026.97 m/s
     :params conn: A krpc connection
     :params vessel: Vessel object
+    :params sea_level_impulse: Whether to use specific impulse at Kerbin sea-level
+    or specific impulse in a vacuum.
     :returns: A float of the estimated delta v
     """
     print("Calculating delta-v")
@@ -57,8 +58,12 @@ def get_estimated_delta_v(conn, vessel):
         # After adding up the mass for parts in the stage, work out the delta v
         # for this stage
         for engine_part in engine_list:
+            if sea_level_impulse:
+                engine_impulse = engine_part.engine.kerbin_sea_level_specific_impulse
+            else:
+                engine_impulse = engine_part.engine.vacuum_specific_impulse
             stage_delta_v = (
-                engine_part.engine.kerbin_sea_level_specific_impulse
+                engine_impulse
                 * kerbin_gravity
                 * math.log(
                     total_mass / (stage_dry_mass_sum + previous_stage_total_mass_sum)
@@ -70,7 +75,6 @@ def get_estimated_delta_v(conn, vessel):
             previous_stage_total_mass_sum = (
                 previous_stage_total_mass_sum + stage_total_mass_sum
             )
-    print(f"Delta-v: {sum_delta_v}")
     return sum_delta_v
 
 

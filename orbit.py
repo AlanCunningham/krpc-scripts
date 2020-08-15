@@ -13,8 +13,6 @@ assumptions are made:
 - The stages are in the following order:
     - Solid boosters
     - Decouple & boost liquid fuel
-    - Decouple if out of fuel
-    - Activate parachute if less than a given altitude
 """
 
 HEADING_NORTH = 0
@@ -36,7 +34,7 @@ def launch(connection, vessel, heading, target_altitude):
     vessel.auto_pilot.engage()
     vessel.auto_pilot.target_pitch_and_heading(90, heading)
     vessel.control.throttle = 1
-    helpers.get_estimated_delta_v(connection, vessel)
+    print(f"Delta-v: {helpers.get_estimated_delta_v(connection, vessel)}")
 
     # Launch
     print("Launch")
@@ -71,6 +69,7 @@ def launch(connection, vessel, heading, target_altitude):
     vessel.auto_pilot.disengage()
     launch_duration = datetime.now() - start_time
     print(f"Stable orbit achieved in {launch_duration}")
+    print(f"Delta-v left: {helpers.get_estimated_delta_v(connection, vessel, sea_level_impulse=False)}")
 
 
 if __name__ == "__main__":
