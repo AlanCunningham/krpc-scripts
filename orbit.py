@@ -36,8 +36,14 @@ def launch(connection, vessel, heading, target_altitude):
     vessel.control.throttle = 1
     print(f"Delta-v: {helpers.get_estimated_delta_v(connection, vessel)}")
 
-    # Launch
-    print("Launch")
+    # Countdown...
+    print('3...')
+    time.sleep(1)
+    print('2...')
+    time.sleep(1)
+    print('1...')
+    time.sleep(1)
+    print('Launch!')
     vessel.control.activate_next_stage()
 
     # Reduce thrusters and set pitch for orbit
