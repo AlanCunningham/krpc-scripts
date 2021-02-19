@@ -73,6 +73,7 @@ def launch(connection, vessel, heading, target_altitude):
 
 
 if __name__ == "__main__":
-    connection = krpc.connect(address="192.168.0.215")
+    server_ip_address = "192.168.0.15"
+    connection = krpc.connect(address=server_ip_address)
     vessel = connection.space_center.active_vessel
     launch(connection, vessel, HEADING_EAST, 80000)
