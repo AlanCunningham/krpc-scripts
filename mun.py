@@ -74,7 +74,7 @@ def orbit(connection, vessel, target_orbit_altitude):
     vessel.auto_pilot.sas = True
     vessel.auto_pilot.sas_mode = vessel.auto_pilot.sas_mode.retrograde
 
-    helpers.wait_for_time_to_periapsis_less_than(connection, vessel, 45)
+    helpers.wait_for_time_to_periapsis_less_than(connection, vessel, 30)
     print("Retro-burning...")
     vessel.control.throttle = 0.3
     # The apoapsis is initially reported as a minus number - probably because
@@ -91,7 +91,7 @@ def orbit(connection, vessel, target_orbit_altitude):
 
     # Even out the other side of the orbit
     print("Waiting for new periapsis to even out the orbit")
-    helpers.wait_for_time_to_periapsis_less_than(connection, vessel, 30)
+    helpers.wait_for_time_to_periapsis_less_than(connection, vessel, 60)
     print("Preparing for burn to even out the orbit")
     vessel.control.rcs = True
     vessel.auto_pilot.sas = True
@@ -101,7 +101,7 @@ def orbit(connection, vessel, target_orbit_altitude):
     else:
         vessel.auto_pilot.sas_mode = vessel.auto_pilot.sas_mode.prograde
 
-    helpers.wait_for_time_to_periapsis_less_than(connection, vessel, 3)
+    helpers.wait_for_time_to_periapsis_less_than(connection, vessel, 30)
     print("Burning...")
     if vessel.orbit.apoapsis_altitude > target_orbit_altitude:
         while vessel.orbit.apoapsis_altitude > target_orbit_altitude:
