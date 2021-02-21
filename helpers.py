@@ -188,3 +188,50 @@ def wait_for_time_to_apoapsis_less_than(connection, vessel, target_time):
     )
     with time_to_apoapsis_event.condition:
         time_to_apoapsis_event.wait()
+
+
+def wait_for_time_to_periapsis_less_than(connection, vessel, target_time):
+    """
+    Wait for the time to periapsis to be less than a given value in seconds.
+    :params conn: A krpc connection
+    :params vessel: A vessel object
+    :params target_time: A double of the target time in seconds to the periapsis
+    """
+    time_to_periapsis = connection.get_call(getattr, vessel.orbit, "time_to_periapsis")
+    monitor_time_to_periapsis_expression = connection.krpc.Expression.less_than(
+        connection.krpc.Expression.call(time_to_periapsis),
+        connection.krpc.Expression.constant_double(target_time),
+    )
+    time_to_periapsis_event = connection.krpc.add_event(
+        monitor_time_to_periapsis_expression
+    )
+    with time_to_periapsis_event.condition:
+        time_to_periapsis_event.wait()
+
+def wait_for_time_to_manuever_less_than(connection, vessel, node, target_time):
+    """
+    Wait the manuever node to be less that a given value in seconds.
+    :params conn: A krpc connection
+    :params vessel: A vessel object
+    :params target_time: A double of the time to maneuver node in seconds
+    """
+    time_to_manuever = connection.get_call(getattr, node, "time_to")
+    monitor_time_to_manuever_expression = connection.krpc.Expression.less_than(
+        connection.krpc.Expression.call(time_to_manuever),
+        connection.krpc.Expression.constant_double(target_time),
+    )
+    time_to_manuever_event = connection.krpc.add_event(
+        monitor_time_to_manuever_expression
+    )
+    with time_to_manuever_event.condition:
+        time_to_manuever_event.wait()
+
+
+def get_relative_inclination_degrees(vessel, target_orbit):
+    """
+    Relative inclination of this orbit and the target orbit, in degrees.
+    params: Target orbit
+    Returns: The relative inclination in degrees as a double
+    """
+    relative_inclination = vessel.orbit.relative_inclination(target_orbit)
+    return math.degrees(relative_inclination)
