@@ -3,6 +3,7 @@ import helpers
 import orbit
 import time
 import sys
+import math
 from datetime import datetime
 
 
@@ -23,30 +24,32 @@ def orbit(connection, vessel, target_orbit_altitude):
         )
         sys.exit(1)
 
-    # Find out if we're closer to the ascending node or the descending node
-    ascending_node_time = vessel.orbit.ut_at_true_anomaly(
-        vessel.orbit.true_anomaly_at_an(mun_target.orbit)
-    )
-    descending_node_time = vessel.orbit.ut_at_true_anomaly(
-        vessel.orbit.true_anomaly_at_dn(mun_target.orbit)
-    )
-    if ascending_node_time < descending_node_time:
-        node_ut_time = ascending_node_time
-    else:
-        node_ut_time = descending_node_time
+    # Creates a manuever node, initially at the current position. If it doesn't
+    # encounter the Mun's sphere of influence, remove the node and plot another
+    # one further on in the orbit. Repeat this process until the manuever
+    # encounters the Mun.
     estimated_mun_encounter_delta_v = 860
-
-    # Create the manuever node
-    # TODO: This only creates manuever nodes on either the ascending or descending
-    # node, regardless of where the Mun is.  We should adjust where the node
-    # is placed dependng on the position of the Mun.
-    node = vessel.control.add_node(
-        node_ut_time, prograde=estimated_mun_encounter_delta_v
-    )
+    # Start with 60 seconds in the future, in case we can encounter the Mun
+    # from the current orbit position.
+    universal_time_increment_counter = 60
+    time_to_soi_change = float("nan")
+    while math.isnan(time_to_soi_change):
+        # Create the manuever node
+        node = vessel.control.add_node(
+            connection.space_center.ut + universal_time_increment_counter,
+            prograde=estimated_mun_encounter_delta_v,
+        )
+        # Returns float "nan" if there is no sphere of influence change
+        time_to_soi_change = node.orbit.time_to_soi_change
+        if math.isnan(time_to_soi_change):
+            # Remove the node and set the increment counter further into the
+            # future.
+            node.remove()
+            universal_time_increment_counter += 100
 
     # Wait until we're close to the manuever node
     print(f"Waiting for manuever ({int(node.time_to)} seconds)")
-    helpers.wait_for_time_to_manuever_less_than(connection, vessel, node, 20)
+    helpers.wait_for_time_to_manuever_less_than(connection, vessel, node, 60)
     # Face the direction of the manuever node
     print("Preparing for manuever")
     vessel.auto_pilot.sas = True
