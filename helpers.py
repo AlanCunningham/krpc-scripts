@@ -235,3 +235,35 @@ def get_relative_inclination_degrees(vessel, target_orbit):
     """
     relative_inclination = vessel.orbit.relative_inclination(target_orbit)
     return math.degrees(relative_inclination)
+
+
+def even_orbit(connection, vessel):
+    # Use manuever nodes to even out the orbit
+    apoapsis_time = connection.space_center.ut + vessel.orbit.time_to_apoapsis
+    periapsis_time = connection.space_center.ut + vessel.orbit.time_to_periapsis
+    print(f"Apoapsis time: {apoapsis_time} | Periapsis time: {periapsis_time}")
+    if apoapsis_time < periapsis_time:
+        print("Closer to periapsis")
+        closer_to_periapsis = True
+    else:
+        print("Closer to apoapsis")
+        closer_to_periapsis = False
+    # Create a manuever node at the apoapsis
+    node = vessel.control.add_node(
+        apoapsis_time,
+    )
+    delta_v_increment_by = 25
+    minimum_difference = 1000
+    while vessel.orbit.apoapsis - node.orbit.periapsis > minimum_difference:
+        node.prograde += delta_v_increment_by
+    vessel.control.rcs = True
+    vessel.auto_pilot.sas = True
+    vessel.auto_pilot.sas_mode = vessel.auto_pilot.sas_mode.maneuver
+    wait_for_time_to_manuever_less_than(connection, vessel, node, 20)
+    while node.remaining_delta_v > 50:
+        vessel.control.throttle = 1
+    while node.remaining_delta_v > 5:
+        vessel.control.throttle = 0.3
+    vessel.control.throttle = 0
+    vessel.control.rcs = False
+    vessel.auto_pilot.sas = False

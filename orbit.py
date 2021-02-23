@@ -60,15 +60,10 @@ def launch(connection, vessel, heading, target_altitude):
     vessel.auto_pilot.target_pitch = 0
     vessel.control.throttle = 0
     vessel.control.rcs = True
+    vessel.auto_pilot.disengage()
     time.sleep(1)
 
-    # Keep boosting until the periapsis reaches the target altitude
-    while vessel.orbit.periapsis_altitude < target_altitude:
-        if vessel.orbit.time_to_apoapsis < 30:
-            vessel.control.throttle = 1
-        else:
-            vessel.control.throttle = 0
-    print(f"At target periapsis: {vessel.orbit.periapsis_altitude}")
+    helpers.even_orbit(connection, vessel)
 
     # In stable orbit
     vessel.control.rcs = False
