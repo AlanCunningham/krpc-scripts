@@ -37,13 +37,13 @@ def launch(connection, vessel, heading, target_altitude):
     print(f"Delta-v: {helpers.get_estimated_delta_v(connection, vessel)}")
 
     # Countdown...
-    print('3...')
+    print("3...")
     time.sleep(1)
-    print('2...')
+    print("2...")
     time.sleep(1)
-    print('1...')
+    print("1...")
     time.sleep(1)
-    print('Launch!')
+    print("Launch!")
     vessel.control.activate_next_stage()
 
     # Reduce thrusters and set pitch for orbit
@@ -63,14 +63,20 @@ def launch(connection, vessel, heading, target_altitude):
     vessel.auto_pilot.disengage()
     time.sleep(1)
 
-    helpers.even_orbit(connection, vessel)
+    # There appears to be an issue when creating a multiple maneuver nodes and
+    # monitoring its time_to attributes. For now, we create an empty maneuver
+    # node and pass that into the helpers.even_orbit function.
+    kerbin_node = vessel.control.add_node(connection.space_center.ut)
+    helpers.even_orbit(connection, vessel, kerbin_node)
 
     # In stable orbit
     vessel.control.rcs = False
     vessel.auto_pilot.disengage()
     launch_duration = datetime.now() - start_time
     print(f"Stable orbit achieved in {launch_duration}")
-    print(f"Delta-v left: {helpers.get_estimated_delta_v(connection, vessel, sea_level_impulse=False)}")
+    print(
+        f"Delta-v left: {helpers.get_estimated_delta_v(connection, vessel, sea_level_impulse=False)}"
+    )
 
 
 if __name__ == "__main__":
