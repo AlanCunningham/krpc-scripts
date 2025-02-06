@@ -61,11 +61,6 @@ def launch(connection, vessel, heading, target_altitude):
     solid_fuel_separated = False
     running = True
     while running:
-        # Reduce thrusters and set pitch for orbit
-        if altitude() > 3000 and apoapsis() < target_altitude:
-            vessel.control.throttle = 0.7
-            vessel.auto_pilot.target_pitch = 45
-
         # Decouple external fuel tanks when empty
         if not solid_fuel_separated:
             if launch_stage_fuel_amount() < 0.1:
@@ -73,9 +68,20 @@ def launch(connection, vessel, heading, target_altitude):
                 solid_fuel_separated = True
                 print("Separating solid fuel boosters")
 
+        # Reduce thrusters and set pitch for orbit
+        if altitude() > 3000 and apoapsis() < target_altitude:
+            vessel.control.throttle = 0.7
+            vessel.auto_pilot.target_pitch = 45
+
         # Approaching the target apoapsis altitude
         if apoapsis() > target_altitude * 0.9:
             print(f"Approaching target apoapsis: {apoapsis()} / {target_altitude}")
+            # Get rid of the solid boosters if they're still in use, as we're
+            # approaching the apoapsis
+            if not solid_fuel_separated:
+                vessel.control.activate_next_stage()
+                solid_fuel_separated = True
+                print("Separating solid fuel boosters early")
             break
 
     # Reduce throttle and boost until we reach the target orbit altitude
@@ -100,8 +106,8 @@ def launch(connection, vessel, heading, target_altitude):
         else:
             # Beginning of circularisation - may need to burn early depending
             # on the ship otherwise we'll overshoot the apoapsis.
-            max_time_to_apoapsis = 20
-            min_time_to_apoapsis = 10
+            max_time_to_apoapsis = 30
+            min_time_to_apoapsis = 15
 
         # Adjust the throttle based on how close to the apoapsis we are.
         adjusted_throttle = 1 - (time_to_apoapsis() - min_time_to_apoapsis) / (
@@ -110,6 +116,7 @@ def launch(connection, vessel, heading, target_altitude):
         vessel.control.throttle = adjusted_throttle
 
     # In stable orbit
+    vessel.control.throttle = 0
     vessel.control.rcs = False
     vessel.auto_pilot.disengage()
     launch_duration = datetime.now() - start_time
