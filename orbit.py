@@ -1,7 +1,8 @@
 import time
+import math
 from datetime import datetime, timedelta
 import krpc
-import helpers
+import settings
 
 
 """
@@ -29,12 +30,23 @@ def launch(connection, vessel, heading, target_altitude):
     :params heading: The heading of the orbit
     :params target_altitude: The target apoapsis and periapsis altitude in meters
     """
+    # Set up telemetry streams
+    altitude = connection.add_stream(getattr, vessel.flight(), "mean_altitude")
+    apoapsis = connection.add_stream(getattr, vessel.orbit, "apoapsis_altitude")
+    periapsis = connection.add_stream(getattr, vessel.orbit, "periapsis_altitude")
+    time_to_apoapsis = connection.add_stream(getattr, vessel.orbit, "time_to_apoapsis")
+    launch_stage = vessel.resources_in_decouple_stage(
+        stage=vessel.control.current_stage - 2, cumulative=False
+    )
+    launch_stage_fuel_amount = connection.add_stream(
+        launch_stage.amount, name="SolidFuel"
+    )
+
     # Setup heading, control and throttle
     start_time = datetime.now()
     vessel.auto_pilot.engage()
     vessel.auto_pilot.target_pitch_and_heading(90, heading)
     vessel.control.throttle = 1
-    print(f"Delta-v: {helpers.get_estimated_delta_v(connection, vessel)}")
 
     # Countdown...
     print("3...")
@@ -46,41 +58,65 @@ def launch(connection, vessel, heading, target_altitude):
     print("Launch!")
     vessel.control.activate_next_stage()
 
-    # Reduce thrusters and set pitch for orbit
-    helpers.wait_for_altitude_more_than(connection, vessel, 3000)
-    vessel.control.throttle = 0.7
-    vessel.auto_pilot.target_pitch = 45
+    solid_fuel_separated = False
+    running = True
+    while running:
+        # Reduce thrusters and set pitch for orbit
+        if altitude() > 3000 and apoapsis() < target_altitude:
+            vessel.control.throttle = 0.7
+            vessel.auto_pilot.target_pitch = 45
 
-    # Decouple external fuel tanks when empty
-    helpers.wait_for_fuel_less_than(connection, vessel, "SolidFuel", 0.1)
-    vessel.control.activate_next_stage()
+        # Decouple external fuel tanks when empty
+        if not solid_fuel_separated:
+            if launch_stage_fuel_amount() < 0.1:
+                vessel.control.activate_next_stage()
+                solid_fuel_separated = True
+                print("Separating solid fuel boosters")
 
-    # Keep boosting until we reach the target orbit altitude
-    helpers.wait_for_apoapsis_more_than(connection, vessel, target_altitude)
-    vessel.auto_pilot.target_pitch = 0
+        # Approaching the target apoapsis altitude
+        if apoapsis() > target_altitude * 0.9:
+            print(f"Approaching target apoapsis: {apoapsis()} / {target_altitude}")
+            break
+
+    # Reduce throttle and boost until we reach the target orbit altitude
+    vessel.control.throttle = 0.25
+    while apoapsis() < target_altitude:
+        pass
+
+    # Reached target apoapsis - shut down engines
+    print(f"Reached target apoapsis: {apoapsis()} / {target_altitude}")
     vessel.control.throttle = 0
-    vessel.control.rcs = True
-    vessel.auto_pilot.disengage()
-    time.sleep(1)
 
-    # There appears to be an issue when creating a multiple maneuver nodes and
-    # monitoring its time_to attributes. For now, we create an empty maneuver
-    # node and pass that into the helpers.even_orbit function.
-    kerbin_node = vessel.control.add_node(connection.space_center.ut)
-    helpers.even_orbit(connection, vessel, kerbin_node)
+    # Circularise the orbit. The throttle is based on how close we are to the
+    # apoapsis - i.e. increase the throttle the closer to the apoapsis we are,
+    # decrease throttle the further away we are.
+    while periapsis() < apoapsis() * 0.99:
+        vessel.auto_pilot.target_pitch = 0
+        if apoapsis() - periapsis() < 15000:
+            # The orbit is almost circularised - we can afford to get closer
+            # to the apoapsis when burning
+            max_time_to_apoapsis = 3
+            min_time_to_apoapsis = 0.1
+        else:
+            # Beginning of circularisation - may need to burn early depending
+            # on the ship otherwise we'll overshoot the apoapsis.
+            max_time_to_apoapsis = 20
+            min_time_to_apoapsis = 10
+
+        # Adjust the throttle based on how close to the apoapsis we are.
+        adjusted_throttle = 1 - (time_to_apoapsis() - min_time_to_apoapsis) / (
+            max_time_to_apoapsis - min_time_to_apoapsis
+        )
+        vessel.control.throttle = adjusted_throttle
 
     # In stable orbit
     vessel.control.rcs = False
     vessel.auto_pilot.disengage()
     launch_duration = datetime.now() - start_time
     print(f"Stable orbit achieved in {launch_duration}")
-    print(
-        f"Delta-v left: {helpers.get_estimated_delta_v(connection, vessel, sea_level_impulse=False)}"
-    )
 
 
 if __name__ == "__main__":
-    server_ip_address = "replace_with_your_server_ip_address"
-    connection = krpc.connect(address=server_ip_address)
+    connection = krpc.connect(address=settings.krpc_ip_address)
     vessel = connection.space_center.active_vessel
-    launch(connection, vessel, HEADING_EAST, 80000)
+    launch(connection, vessel, HEADING_EAST, 75000)
