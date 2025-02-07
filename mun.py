@@ -1,10 +1,6 @@
 import krpc
-import helpers
 import settings
-import orbit
 import time
-import sys
-import signal
 import math
 from datetime import datetime
 
