@@ -1,5 +1,6 @@
 import krpc
 import helpers
+import settings
 import orbit
 import time
 import sys
@@ -17,13 +18,10 @@ def kerbin_to_mun(connection, vessel, target_orbit_altitude):
     :parmas target_orbit_altitude: A double of the target orbit altitude
     """
     start_time = datetime.now()
-    # Target the Mun - this will need to be set manually for now
-    mun_target = connection.space_center.target_body
-    if mun_target is None:
-        print(
-            "No target selected - make sure to select the Mun as a target before running this script"
-        )
-        sys.exit(1)
+    ut = connection.add_stream(getattr, connection.space_center, "ut")
+
+    # Target the Mun
+    connection.space_center.target_body = connection.space_center.bodies["Mun"]
 
     # Creates a manuever node, initially at the current position. If it doesn't
     # encounter the Mun's sphere of influence, move the node further on in the
@@ -44,37 +42,85 @@ def kerbin_to_mun(connection, vessel, target_orbit_altitude):
             # Increment counter further into the future.
             mun_node.ut += universal_time_increment_counter
 
-    # Wait until we're close to the manuever mun_node
-    helpers.wait_for_time_to_manuever_less_than(connection, vessel, mun_node, 60)
     # Face the direction of the manuever mun_node
-    print("Preparing for manuever")
+    vessel.auto_pilot.disengage()
     vessel.auto_pilot.sas = True
     vessel.control.rcs = True
-    vessel.auto_pilot.sas_mode = vessel.auto_pilot.sas_mode.maneuver
+    # There seems to be a race condition of some sort where SAS pilot mode
+    # gets enabled, but doesn't switch to maneuver mode. Workaround here
+    # is just to keep trying until we've switched to maneuever mode.
+    while vessel.auto_pilot.sas_mode != vessel.auto_pilot.sas_mode.maneuver:
+        time.sleep(1)
+        vessel.auto_pilot.sas_mode = vessel.auto_pilot.sas_mode.maneuver
+
+    # Warp to manuever
+    time_to_mun_manuever = connection.add_stream(getattr, mun_node, "time_to")
+    print(f"Manuever in {time_to_mun_manuever()} seconds")
+    lead_time = 45
+    connection.space_center.warp_to((ut() + time_to_mun_manuever()) - lead_time)
+
+    while time_to_mun_manuever() >= 30:
+        pass
 
     # Start burning in the direction of the manuever mun_node
-    helpers.wait_for_time_to_manuever_less_than(connection, vessel, mun_node, 3)
-    print("Burning...")
+    print("Starting burn for Mun")
     while mun_node.remaining_delta_v > 5:
         vessel.control.throttle = 1
+
     # Finished burn
     print("Manuever complete")
     vessel.control.throttle = 0
-    vessel.control.rcs = False
-    vessel.auto_pilot.sas = False
+    mun_node.remove()
+    # vessel.control.rcs = False
+    # vessel.auto_pilot.sas = False
 
-    # We want to set the next maneuver after the sphere of influence change.
-    # Add a buffer to the sphere of influence change time.
-    buffer_seconds = 20
-    soi_change_time = connection.space_center.ut + vessel.orbit.time_to_soi_change
-    # There appears to be an issue when creating a new maneuver node, where
-    # the helpers.wait_for_time_maneuver_less_than function doesn't count
-    # the time_to correctly.  For now, we move the existing mun_node node object.
-    mun_node.ut = soi_change_time + buffer_seconds
-    mun_node.prograde = 0
-    helpers.wait_for_time_to_manuever_less_than(connection, vessel, mun_node, 10)
-    # Even out the orbit
-    helpers.even_orbit(connection, vessel, mun_node, next_orbit=False)
+    # Warp to the Mun's periapsis
+    # First warp to the SOI change
+    time_to_mun_soi_change = connection.add_stream(
+        getattr, vessel.orbit, "time_to_soi_change"
+    )
+    buffer_time = 10
+    connection.space_center.warp_to((ut() + time_to_mun_soi_change()) + buffer_time)
+
+    # Face retrograde
+    while vessel.auto_pilot.sas_mode != vessel.auto_pilot.sas_mode.retrograde:
+        time.sleep(1)
+        vessel.auto_pilot.sas_mode = vessel.auto_pilot.sas_mode.retrograde
+
+    # Now warp to the Mun's periapsis
+    time_to_periapsis = connection.add_stream(
+        getattr, vessel.orbit, "time_to_periapsis"
+    )
+    lead_time = 75
+    connection.space_center.warp_to((ut() + time_to_periapsis()) - lead_time)
+
+    while time_to_periapsis() > 60:
+        pass
+
+    # Circularise the orbit by burning retrograde.
+    # The apoapsis readings start off as a minus value, and then switch to a
+    # positive, so we do two checks here. First check for when the apoapsis
+    # switches, and then compare against the higher value.
+    periapsis = connection.add_stream(getattr, vessel.orbit, "periapsis_altitude")
+    apoapsis = connection.add_stream(getattr, vessel.orbit, "apoapsis_altitude")
+
+    while periapsis() > apoapsis() * 0.99:
+        vessel.control.throttle = 1
+
+    # Apoapsis reading has switched
+    # The throttle is based on how close we are to the periapsis - i.e. increase
+    # the throttle the closer to the periapsis we are, decrease throttle the
+    # further away we are.
+    vessel.control.throttle = 0
+    while periapsis() < apoapsis() * 0.99:
+        max_time_to_periapsis = 30
+        min_time_to_periapsis = 20
+
+        # Adjust the throttle based on how close to the periapsis we are.
+        adjusted_throttle = 1 - (time_to_periapsis() - min_time_to_periapsis) / (
+            max_time_to_periapsis - min_time_to_periapsis
+        )
+        vessel.control.throttle = adjusted_throttle
 
     # In stable orbit
     vessel.control.rcs = False
@@ -83,14 +129,10 @@ def kerbin_to_mun(connection, vessel, target_orbit_altitude):
     vessel.auto_pilot.disengage()
 
     duration = datetime.now() - start_time
-    print(f"{mun_target.name} orbit achieved in {duration}")
-    print(
-        f"Delta-v left: {helpers.get_estimated_delta_v(connection, vessel, sea_level_impulse=False)}"
-    )
+    print(f"Orbit achieved in {duration}")
 
 
 if __name__ == "__main__":
-    server_ip_address = "192.168.0.15"
-    connection = krpc.connect(address=server_ip_address)
+    connection = krpc.connect(address=settings.krpc_ip_address)
     vessel = connection.space_center.active_vessel
     kerbin_to_mun(connection, vessel, 300000)
