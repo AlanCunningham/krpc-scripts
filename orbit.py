@@ -43,7 +43,6 @@ def launch(connection, vessel, heading, target_altitude):
     )
 
     # Setup heading, control and throttle
-    start_time = datetime.now()
     vessel.auto_pilot.engage()
     vessel.auto_pilot.target_pitch_and_heading(90, heading)
     vessel.control.throttle = 1
@@ -57,6 +56,7 @@ def launch(connection, vessel, heading, target_altitude):
     time.sleep(1)
     print("Launch!")
     vessel.control.activate_next_stage()
+    start_time = datetime.now()
 
     solid_fuel_separated = False
     running = True
@@ -106,8 +106,8 @@ def launch(connection, vessel, heading, target_altitude):
         else:
             # Beginning of circularisation - may need to burn early depending
             # on the ship otherwise we'll overshoot the apoapsis.
-            max_time_to_apoapsis = 30
-            min_time_to_apoapsis = 15
+            max_time_to_apoapsis = 45
+            min_time_to_apoapsis = 30
 
         # Adjust the throttle based on how close to the apoapsis we are.
         adjusted_throttle = 1 - (time_to_apoapsis() - min_time_to_apoapsis) / (
