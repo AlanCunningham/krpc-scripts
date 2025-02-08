@@ -92,28 +92,30 @@ def launch(connection, vessel, heading, target_altitude):
     # Reached target apoapsis - shut down engines
     print(f"Reached target apoapsis: {apoapsis()} / {target_altitude}")
     vessel.control.throttle = 0
+    vessel.auto_pilot.target_pitch = 0
 
-    # Circularise the orbit. The throttle is based on how close we are to the
-    # apoapsis - i.e. increase the throttle the closer to the apoapsis we are,
-    # decrease throttle the further away we are.
+    # Circularise the orbit.
     while periapsis() < apoapsis() * 0.99:
-        vessel.auto_pilot.target_pitch = 0
-        if apoapsis() - periapsis() < 15000:
-            # The orbit is almost circularised - we can afford to get closer
-            # to the apoapsis when burning
-            max_time_to_apoapsis = 3
-            min_time_to_apoapsis = 0.1
-        else:
-            # Beginning of circularisation - may need to burn early depending
-            # on the ship otherwise we'll overshoot the apoapsis.
-            max_time_to_apoapsis = 45
-            min_time_to_apoapsis = 30
+        max_time_to_apoapsis = 20
+        min_time_to_apoapsis = 10
 
-        # Adjust the throttle based on how close to the apoapsis we are.
+        # The throttle is based on how close we are to the apoapsis - i.e.
+        # increase the throttle the closer to the apoapsis we are, decrease
+        # throttle the further away we are.
         adjusted_throttle = 1 - (time_to_apoapsis() - min_time_to_apoapsis) / (
             max_time_to_apoapsis - min_time_to_apoapsis
         )
         vessel.control.throttle = adjusted_throttle
+
+        # Adjust pitch based on how close we are to the apoapsis - i.e., pitch
+        # up if we're close to the apoapsis, and pitch down the further
+        # away we are.
+        if time_to_apoapsis() <= max_time_to_apoapsis:
+            adjusted_pitch = -10 + (1 - (time_to_apoapsis() - min_time_to_apoapsis) / (
+                max_time_to_apoapsis - min_time_to_apoapsis
+            )) * 20
+
+            vessel.auto_pilot.target_pitch = adjusted_pitch
 
     # In stable orbit
     vessel.control.throttle = 0
