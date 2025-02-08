@@ -110,6 +110,8 @@ def launch(connection, vessel, heading, target_altitude):
         # Adjust pitch based on how close we are to the apoapsis - i.e., pitch
         # up if we're close to the apoapsis, and pitch down the further
         # away we are.
+        # This is similar to the formula above, but we set the range between
+        # -10 and 10 degrees, above and below the horizon on the navball.
         if time_to_apoapsis() <= max_time_to_apoapsis:
             adjusted_pitch = -10 + (1 - (time_to_apoapsis() - min_time_to_apoapsis) / (
                 max_time_to_apoapsis - min_time_to_apoapsis
