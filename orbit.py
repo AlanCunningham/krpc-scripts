@@ -53,10 +53,18 @@ def launch(connection, vessel, heading, target_altitude):
     solid_fuel_separated = False
     running = True
     while running:
-        # Reduce thrusters and set pitch for orbit
-        if altitude() > 3000 and apoapsis() < target_altitude:
-            vessel.control.throttle = 0.7
-            vessel.auto_pilot.target_pitch = 45
+        # Start gravity turn - we start pointing up (90 degrees) and gradually
+        # pitch until we're at 45 degrees.
+        min_altitude = 0
+        max_altitude = 10000
+        start_pitch = 90
+        end_pitch = 45
+        if apoapsis() < target_altitude and int(vessel.auto_pilot.target_pitch) != end_pitch:
+            adjusted_pitch = start_pitch - ((altitude() - min_altitude) / (
+                max_altitude - min_altitude
+            )) * end_pitch
+
+            vessel.auto_pilot.target_pitch = adjusted_pitch
 
         # Approaching the target apoapsis altitude
         if apoapsis() > target_altitude * 0.9:
@@ -85,11 +93,11 @@ def launch(connection, vessel, heading, target_altitude):
 
     # Circularise the orbit.
     while periapsis() < apoapsis() * 0.99:
-        max_time_to_apoapsis = 20
+        max_time_to_apoapsis = 25
         min_time_to_apoapsis = 15
 
         if time_to_apoapsis() < max_time_to_apoapsis:
-            if periapsis() > apoapsis() * 0.8:
+            if periapsis() > apoapsis() * 0.7:
                 # Decrease throttle when the periapsis is almost the same as the
                 # apoapsis
                 vessel.control.throttle = 0.1
