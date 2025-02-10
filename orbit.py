@@ -1,19 +1,13 @@
 import time
-import math
 from datetime import datetime, timedelta
 import krpc
+import helpers
 import settings
 
 
+
 """
-This script takes a two-stage rocket and launches it into orbit. The following
-assumptions are made:
-- The first stage uses solid fuel boosters
-- The second stage has RCS available
-- There's enough fuel available to get into orbit
-- The stages are in the following order:
-    - Solid boosters
-    - Decouple & boost liquid fuel
+This script takes a rocket and launches it into orbit from Kerbin.
 """
 
 HEADING_NORTH = 0
@@ -35,12 +29,6 @@ def launch(connection, vessel, heading, target_altitude):
     apoapsis = connection.add_stream(getattr, vessel.orbit, "apoapsis_altitude")
     periapsis = connection.add_stream(getattr, vessel.orbit, "periapsis_altitude")
     time_to_apoapsis = connection.add_stream(getattr, vessel.orbit, "time_to_apoapsis")
-    launch_stage = vessel.resources_in_decouple_stage(
-        stage=vessel.control.current_stage - 2, cumulative=False
-    )
-    launch_stage_fuel_amount = connection.add_stream(
-        launch_stage.amount, name="SolidFuel"
-    )
 
     # Setup heading, control and throttle
     vessel.auto_pilot.engage()
@@ -58,16 +46,13 @@ def launch(connection, vessel, heading, target_altitude):
     vessel.control.activate_next_stage()
     start_time = datetime.now()
 
+    # When fuel is empty in the current stage, automatically move to the next
+    # one
+    helpers.enable_auto_stage(connection, vessel)
+
     solid_fuel_separated = False
     running = True
     while running:
-        # Decouple external fuel tanks when empty
-        if not solid_fuel_separated:
-            if launch_stage_fuel_amount() < 0.1:
-                vessel.control.activate_next_stage()
-                solid_fuel_separated = True
-                print("Separating solid fuel boosters")
-
         # Reduce thrusters and set pitch for orbit
         if altitude() > 3000 and apoapsis() < target_altitude:
             vessel.control.throttle = 0.7
@@ -79,9 +64,13 @@ def launch(connection, vessel, heading, target_altitude):
             # Get rid of the solid boosters if they're still in use, as we're
             # approaching the apoapsis
             if not solid_fuel_separated:
-                vessel.control.activate_next_stage()
-                solid_fuel_separated = True
-                print("Separating solid fuel boosters early")
+                fuel_in_current_stage = vessel.resources_in_decouple_stage(
+                    stage=vessel.control.current_stage - 1, cumulative=False
+                )
+                if "SolidFuel" in fuel_in_current_stage.names:
+                    vessel.control.activate_next_stage()
+                    solid_fuel_separated = True
+                    print("Near target apoapsis - separating solid fuel boosters early")
             break
 
     # Reduce throttle and boost until we reach the target orbit altitude
@@ -97,21 +86,24 @@ def launch(connection, vessel, heading, target_altitude):
     # Circularise the orbit.
     while periapsis() < apoapsis() * 0.99:
         max_time_to_apoapsis = 20
-        min_time_to_apoapsis = 10
+        min_time_to_apoapsis = 15
 
-        # The throttle is based on how close we are to the apoapsis - i.e.
-        # increase the throttle the closer to the apoapsis we are, decrease
-        # throttle the further away we are.
-        adjusted_throttle = 1 - (time_to_apoapsis() - min_time_to_apoapsis) / (
-            max_time_to_apoapsis - min_time_to_apoapsis
-        )
-        vessel.control.throttle = adjusted_throttle
+        if time_to_apoapsis() < max_time_to_apoapsis:
+            if periapsis() > apoapsis() * 0.8:
+                # Decrease throttle when the periapsis is almost the same as the
+                # apoapsis
+                vessel.control.throttle = 0.1
+            else:
+                vessel.control.throttle = 1
+        else:
+            # Don't throttle until we're closer to the apoapsis
+            vessel.control.throttle = 0
 
         # Adjust pitch based on how close we are to the apoapsis - i.e., pitch
-        # up if we're close to the apoapsis, and pitch down the further
-        # away we are.
-        # This is similar to the formula above, but we set the range between
-        # -10 and 10 degrees, above and below the horizon on the navball.
+        # up by 10 degrees if we're close to the apoapsis, and pitch down by 10
+        # degrees the further away we are.
+        # Pitching up will "move" the apoapsis further away, while pitching down
+        # will "move" the apoapsis closer to us.
         if time_to_apoapsis() <= max_time_to_apoapsis:
             adjusted_pitch = -10 + (1 - (time_to_apoapsis() - min_time_to_apoapsis) / (
                 max_time_to_apoapsis - min_time_to_apoapsis
@@ -123,6 +115,7 @@ def launch(connection, vessel, heading, target_altitude):
     vessel.control.throttle = 0
     vessel.control.rcs = False
     vessel.auto_pilot.disengage()
+    helpers.disable_auto_stage()
     launch_duration = datetime.now() - start_time
     print(f"Stable orbit achieved in {launch_duration}")
 

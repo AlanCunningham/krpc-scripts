@@ -1,5 +1,8 @@
 import math
-import time
+import threading
+
+
+auto_stage_enabled = False
 
 
 def get_thrust_to_weight_ratio(conn, vessel):
@@ -77,3 +80,55 @@ def get_estimated_delta_v(conn, vessel, sea_level_impulse=True):
                 previous_stage_total_mass_sum + stage_total_mass_sum
             )
     return sum_delta_v
+
+
+def _auto_stage_thread(connection, vessel):
+    """
+    Automatically activate the next stage once the current stage's fuel is
+    empty. Will skip past stages that don't have fuel (e.g. separation-only
+    stages)
+    """
+    while auto_stage_enabled:
+        fuel_in_current_stage = vessel.resources_in_decouple_stage(
+            stage=vessel.control.current_stage - 1, cumulative=False
+        )
+        if not fuel_in_current_stage.names:
+            print("No fuel in this stage - moving to next stage")
+            vessel.control.activate_next_stage()
+        else:
+            print(f"Fuel types in this stage: {fuel_in_current_stage.names}")
+            fuel_in_current_stage_fuel_amount = connection.add_stream(
+                fuel_in_current_stage.amount, name=fuel_in_current_stage.names[0]
+            )
+            while fuel_in_current_stage_fuel_amount() > 0.1:
+                if auto_stage_enabled:
+                    pass
+                else:
+                    break
+
+            if auto_stage_enabled:
+                print(f"{fuel_in_current_stage.names} empty - moving to next stage")
+                vessel.control.activate_next_stage()
+
+
+def enable_auto_stage(connection, vessel):
+    """
+    Enable auto staging. Starts a new thread to monitor the fuel in the current
+    stage, and moves to the next stage when there's no fuel.
+    """
+    global auto_stage_enabled
+    auto_stage_enabled = True
+    auto_stage_thread = threading.Thread(
+        target=_auto_stage_thread,
+        args=[connection, vessel],
+    )
+    auto_stage_thread.should_abort_immediately = True
+    auto_stage_thread.start()
+
+
+def disable_auto_stage():
+    """
+    Stop auto staging.
+    """
+    global auto_stage_enabled
+    auto_stage_enabled = False
