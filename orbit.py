@@ -50,7 +50,6 @@ def launch(connection, vessel, heading, target_altitude):
     # one
     helpers.enable_auto_stage(connection, vessel)
 
-    solid_fuel_separated = False
     running = True
     while running:
         # Start gravity turn - we start pointing up (90 degrees) and gradually
@@ -71,14 +70,13 @@ def launch(connection, vessel, heading, target_altitude):
             print(f"Approaching target apoapsis: {apoapsis()} / {target_altitude}")
             # Get rid of the solid boosters if they're still in use, as we're
             # approaching the apoapsis
-            if not solid_fuel_separated:
-                fuel_in_current_stage = vessel.resources_in_decouple_stage(
-                    stage=vessel.control.current_stage - 1, cumulative=False
-                )
-                if "SolidFuel" in fuel_in_current_stage.names:
-                    vessel.control.activate_next_stage()
-                    solid_fuel_separated = True
-                    print("Near target apoapsis - separating solid fuel boosters early")
+            fuel_in_current_stage = vessel.resources_in_decouple_stage(
+                stage=vessel.control.current_stage - 1, cumulative=False
+            )
+            if "SolidFuel" in fuel_in_current_stage.names:
+                vessel.control.activate_next_stage()
+                solid_fuel_separated = True
+                print("Near target apoapsis - separating solid fuel boosters early")
             break
 
     # Reduce throttle and boost until we reach the target orbit altitude
@@ -105,7 +103,6 @@ def launch(connection, vessel, heading, target_altitude):
                 max_apoapsis - starting_periapsis
             )
             if adjusted_throttle > 0.1:
-                print(adjusted_throttle)
                 vessel.control.throttle = adjusted_throttle
 
 
