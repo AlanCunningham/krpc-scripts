@@ -18,15 +18,8 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-# Running the orbit script
-The orbit script makes the following assumptions:
-- The first stage uses solid fuel boosters
-- There's enough fuel available to get into orbit
-- The stages are in the following order:
-    - Solid boosters
-    - Decouple & boost liquid fuel
-
-Running the orbit.py script directly will launch the two-stage rocket into orbit.
+# Running the scripts
+Running the orbit.py script directly will launch your rocket into orbit.
 ```
 (venv) $ python orbit.py
 ```
@@ -40,3 +33,9 @@ connection = krpc.connect(address=ip_address)
 vessel = connection.space_center.active_vessel
 orbit.launch(connection, vessel, orbit.HEADING_EAST, 80000)
 ```
+
+Running the mun.py script will maneuver a rocket already in Kerbin-orbit to an orbit around the Mun:
+ ```
+(venv) $ python mun.py
+```
+
