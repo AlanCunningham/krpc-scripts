@@ -92,27 +92,28 @@ def launch(connection, vessel, heading, target_altitude):
     vessel.auto_pilot.target_pitch = 0
 
     # Circularise the orbit.
+    starting_periapsis = periapsis()
+    max_apoapsis = apoapsis() * 0.7
     while periapsis() < apoapsis() * 0.99:
         max_time_to_apoapsis = 25
         min_time_to_apoapsis = 15
 
-        if time_to_apoapsis() < max_time_to_apoapsis:
-            if periapsis() > apoapsis() * 0.7:
-                # Decrease throttle when the periapsis is almost the same as the
-                # apoapsis
-                vessel.control.throttle = 0.1
-            else:
-                vessel.control.throttle = 1
-        else:
-            # Don't throttle until we're closer to the apoapsis
-            vessel.control.throttle = 0
-
-        # Adjust pitch based on how close we are to the apoapsis - i.e., pitch
-        # up by 10 degrees if we're close to the apoapsis, and pitch down by 10
-        # degrees the further away we are.
-        # Pitching up will "move" the apoapsis further away, while pitching down
-        # will "move" the apoapsis closer to us.
         if time_to_apoapsis() <= max_time_to_apoapsis:
+            # Adjust the throttle - start at full throttle and gradually reduce
+            # as the periapsis matches the apoapsis.
+            adjusted_throttle = 1 - (periapsis() - starting_periapsis) / (
+                max_apoapsis - starting_periapsis
+            )
+            if adjusted_throttle > 0.1:
+                print(adjusted_throttle)
+                vessel.control.throttle = adjusted_throttle
+
+
+            # Adjust pitch based on how close we are to the apoapsis - i.e., pitch
+            # up by 10 degrees if we're close to the apoapsis, and pitch down by 10
+            # degrees the further away we are.
+            # Pitching up will "move" the apoapsis further away, while pitching down
+            # will "move" the apoapsis closer to us.
             adjusted_pitch = -10 + (1 - (time_to_apoapsis() - min_time_to_apoapsis) / (
                 max_time_to_apoapsis - min_time_to_apoapsis
             )) * 20
